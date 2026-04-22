@@ -1,0 +1,26 @@
+system,embedding,threshold,TP,FP,FN,TN,precision,recall,f1,avg_latency_ms,wall_time_s
+GPTCache-ONNX,onnx-paraphrase-albert,0.7,267,99,16,618,0.7295,0.9435,0.8228,167.47,167.49
+GPTCache-ONNX,onnx-paraphrase-albert,0.75,247,77,36,640,0.7623,0.8728,0.8138,178.22,178.24
+GPTCache-ONNX,onnx-paraphrase-albert,0.8,223,68,61,648,0.7663,0.7852,0.7757,181.17,181.19
+GPTCache-ONNX,onnx-paraphrase-albert,0.85,162,48,128,662,0.7714,0.5586,0.648,182.42,182.44
+GPTCache-ONNX,onnx-paraphrase-albert,0.9,101,29,195,675,0.7769,0.3412,0.4742,189.34,189.36
+GPTCache-MiniLM,all-MiniLM-L6-v2,0.7,264,128,17,591,0.6735,0.9395,0.7845,18.06,18.08
+GPTCache-MiniLM,all-MiniLM-L6-v2,0.75,244,97,39,620,0.7155,0.8622,0.7821,15.71,15.72
+GPTCache-MiniLM,all-MiniLM-L6-v2,0.8,215,70,71,644,0.7544,0.7517,0.7531,15.09,15.09
+GPTCache-MiniLM,all-MiniLM-L6-v2,0.85,175,47,115,663,0.7883,0.6034,0.6836,15.39,15.4
+GPTCache-MiniLM,all-MiniLM-L6-v2,0.9,128,24,167,681,0.8421,0.4339,0.5727,15.21,15.22
+GPTCache-BGE-S,BAAI/bge-small-en-v1.5,0.7,278,267,0,455,0.5101,1.0,0.6756,22.18,22.19
+GPTCache-BGE-S,BAAI/bge-small-en-v1.5,0.75,276,178,2,544,0.6079,0.9928,0.7541,21.71,21.72
+GPTCache-BGE-S,BAAI/bge-small-en-v1.5,0.8,259,130,22,589,0.6658,0.9217,0.7731,21.7,21.72
+GPTCache-BGE-S,BAAI/bge-small-en-v1.5,0.85,228,80,56,636,0.7403,0.8028,0.7703,22.14,22.15
+GPTCache-BGE-S,BAAI/bge-small-en-v1.5,0.9,166,36,126,672,0.8218,0.5685,0.6721,21.74,21.75
+GPTCache-BGE-B,BAAI/bge-base-en-v1.5,0.7,279,213,0,508,0.5671,1.0,0.7237,27.94,27.95
+GPTCache-BGE-B,BAAI/bge-base-en-v1.5,0.75,276,157,3,564,0.6374,0.9892,0.7753,24.83,24.83
+GPTCache-BGE-B,BAAI/bge-base-en-v1.5,0.8,247,112,36,605,0.688,0.8728,0.7695,25.09,25.1
+GPTCache-BGE-B,BAAI/bge-base-en-v1.5,0.85,207,65,80,648,0.761,0.7213,0.7406,24.58,24.59
+GPTCache-BGE-B,BAAI/bge-base-en-v1.5,0.9,151,28,141,680,0.8436,0.5171,0.6412,24.51,24.52
+ContextCache-MiniLM,all-MiniLM-L6-v2 + BatchOptimizedEncoder,0.7,264,128,17,591,0.6735,0.9395,0.7845,15.95,15.95
+ContextCache-MiniLM,all-MiniLM-L6-v2 + BatchOptimizedEncoder,0.75,244,97,39,620,0.7155,0.8622,0.7821,15.5,15.51
+ContextCache-MiniLM,all-MiniLM-L6-v2 + BatchOptimizedEncoder,0.8,215,70,71,644,0.7544,0.7517,0.7531,15.38,15.38
+ContextCache-MiniLM,all-MiniLM-L6-v2 + BatchOptimizedEncoder,0.85,175,47,115,663,0.7883,0.6034,0.6836,15.67,15.68
+ContextCache-MiniLM,all-MiniLM-L6-v2 + BatchOptimizedEncoder,0.9,128,24,167,681,0.8421,0.4339,0.5727,15.83,15.84

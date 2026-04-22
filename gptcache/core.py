@@ -78,6 +78,7 @@ class Cache:
         self.post_process_messages_func = post_func if post_func else post_process_messages_func
         self.config = config
         self.next_cache = next_cache
+        self.input_summarizer = SummarizationContextProcess() if config.input_summary_len is not None else None
 
         @atexit.register
         def close():
@@ -95,12 +96,57 @@ class Cache:
         :param session_ids: list of the session id.
         :return: None
         """
+        newquestions = []
+        newanswers = []
+        newemb = []
+        newcontext = []
+        cur_ids = []
+        pre_ids = []
+        cur = self.config.cur_id
+        text_length = self.config.input_summary_len
+        for i,question in enumerate(questions):
+            if isinstance(question, str):
+                newquestions.append(question)
+                cur_ids.append(cur)
+                pre_ids.append(-1)
+                cur += 1
+                newanswers.append(answers[i])
+                if text_length is not None and self.input_summarizer is not None and len(question) > text_length:
+                    question = self.input_summarizer.summarize_to_sentence([question], text_length)
+                emb = self.embedding_func(question)
+                newemb.append(emb)
+                newcontext.append(np.array([emb]))
+            elif isinstance(question, list): # dialuoge
+                tmp = []
+                for j,q in enumerate(question):
+                    if text_length is not None and self.input_summarizer is not None and len(q) > text_length:
+                        q = self.input_summarizer.summarize_to_sentence([q], text_length)
+                    emb = self.embedding_func(q)
+                    tmp.append(emb)
+                    cur_ids.append(cur)
+                    if j == 0:
+                        pre_ids.append(-1)
+                    else:
+                        pre_ids.append(cur - 1)
+                    cur += 1
+                    newquestions.append(q)
+                    newanswers.append(answers[i][j])
+                    newemb.append(tmp[-1])
+                    if len(tmp) >5:
+                        tmp = tmp[-5:]
+                    newcontext.append(np.array(tmp))
+            else:
+                raise ValueError("question type not supported")
 
+        self.config.cur_id = cur
         self.data_manager.import_data(
-            questions=questions,
-            answers=answers,
-            embedding_datas=[self.embedding_func(question) for question in questions],
-            session_ids=session_ids if session_ids else [None for _ in range(len(questions))],
+            questions=newquestions,
+            answers=newanswers,
+            embedding_datas=newemb,
+            context_datas=newcontext,
+            cur_ids=cur_ids,
+            pre_ids=pre_ids,
+            session_ids=session_ids if session_ids else [None for _ in range(len(newquestions))],
         )
 
     def flush(self):

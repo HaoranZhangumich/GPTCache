@@ -12,7 +12,309 @@ from gptcache.utils.time import time_cal
 def adapt(llm_handler, cache_data_convert, update_cache_callback, *args, **kwargs):
     """Adapt to different llm
 
-    :param llm_handler: LLM calling method, when the cache misses, this function will be called
+    :param llm_handler: Async LLM calling method, when the cache misses, this function will be called
+    :param cache_data_convert: When the cache hits, convert the answer in the cache to the format of the result returned by llm
+    :param update_cache_callback: If the cache misses, after getting the result returned by llm, save the result to the cache
+    :param args: llm args
+    :param kwargs: llm kwargs
+    :return: llm result
+    """
+    start_time = time.time()
+    user_temperature = "temperature" in kwargs
+    user_top_k = "top_k" in kwargs
+    temperature = kwargs.pop("temperature", 0.0)
+    chat_cache = kwargs.pop("cache_obj", cache)
+    session = kwargs.pop("session", None)
+    require_object_store = kwargs.pop("require_object_store", False)
+    if require_object_store:
+        assert chat_cache.data_manager.o, "Object store is required for adapter."
+    if not chat_cache.has_init:
+        raise NotInitError()
+    cache_enable = chat_cache.cache_enable_func(*args, **kwargs)
+    context = kwargs.pop("cache_context", {})
+    embedding_data = None
+
+    # you want to retry to send the request to chatgpt when the cache is negative
+    if 0 < temperature < 2:
+        cache_skip_options = [True, False]
+        prob_cache_skip = [0, 1]
+        cache_skip = kwargs.pop(
+            "cache_skip",
+            temperature_softmax(
+                messages=cache_skip_options,
+                scores=prob_cache_skip,
+                temperature=temperature,
+            ),
+        )
+    elif temperature >= 2:
+        cache_skip = kwargs.pop("cache_skip", True)
+    else:  # temperature <= 0
+        cache_skip = kwargs.pop("cache_skip", False)
+    cache_factor = kwargs.pop("cache_factor", 1.0)
+
+    # get current query and context from kwargs
+    pre_embedding_res, context_res = time_cal(
+        chat_cache.pre_embedding_func,
+        func_name="pre_process",
+        report_func=chat_cache.report.pre,
+    )(
+        kwargs,
+        extra_param=context.get("pre_embedding_func", None),
+        prompts=chat_cache.config.prompts,
+        cache_config=chat_cache.config,
+    )
+    if isinstance(pre_embedding_res, tuple):
+        pre_store_data = pre_embedding_res[0]
+        pre_embedding_data = pre_embedding_res[1]
+    else:
+        pre_store_data = pre_embedding_res
+        pre_embedding_data = pre_embedding_res
+
+    if chat_cache.config.input_summary_len is not None:
+        if len(pre_embedding_data) > chat_cache.config.input_summary_len:
+            print(pre_embedding_data)
+            pre_embedding_data = chat_cache.input_summarizer.summarize_to_sentence(
+                [pre_embedding_data], 
+                chat_cache.config.input_summary_len
+            )
+            print(pre_embedding_data)
+
+    if cache_enable:
+        embedding_data = time_cal(
+            chat_cache.embedding_func,
+            func_name="embedding",
+            report_func=chat_cache.report.embedding,
+        )(pre_embedding_data, extra_param=context.get("embedding_func", None))
+    if cache_enable and not cache_skip:
+        search_data_list = time_cal(
+            chat_cache.data_manager.search,
+            func_name="search",
+            report_func=chat_cache.report.search,
+        )(
+            embedding_data,
+            extra_param=context.get("search_func", None),
+            top_k = 5 # kwargs.pop("top_k", 5)
+            # if (user_temperature and not user_top_k)
+            # else kwargs.pop("top_k", 5),
+        )
+
+        if search_data_list is None:
+            search_data_list = []
+
+        cur_id = chat_cache.config.cur_id
+        cache_answers = []
+        # get current context embedding
+        if len(chat_cache.config.context_a) > 0:
+            pre_id = cur_id - 1
+            cur_context_data = chat_cache.config.context_emb
+            if cur_context_data is None:
+                cur_context_data = [
+                time_cal(
+                    chat_cache.embedding_func,
+                    func_name="embedding",
+                    report_func=chat_cache.report.embedding,
+                )(ori_data, extra_param=context.get("embedding_func", None)) 
+                for ori_data in  context_res]
+            if chat_cache.config.set_use_api == False:
+                cur_context_data.append(embedding_data)
+            if len(cur_context_data) > 5:
+                cur_context_data = cur_context_data[-5:]
+            chat_cache.config.context_emb = cur_context_data
+            cur_context_data = np.array(cur_context_data)
+        else:
+            chat_cache.config.context_emb = [embedding_data]
+            cur_context_data = np.array([embedding_data])
+            pre_id = -1
+        
+        method = chat_cache.config.method
+        threshold = chat_cache.config.similarity_threshold
+        dialuoge_threshold = chat_cache.config.dialuoge_threshold
+        retrival_id_query = {}
+        retrival_id_context = {}
+
+        # exact_match
+        if chat_cache.config.set_use_api == False:
+            for search_data in search_data_list:
+                cache_data = time_cal(
+                    chat_cache.data_manager.get_scalar_data,
+                    func_name="get_data",
+                    report_func=chat_cache.report.data,
+                )(
+                    search_data,
+                    extra_param=context.get("get_scalar_data", None),
+                    session=session,
+                )
+                if cache_data is None:
+                    continue
+
+                # cache consistency check
+                if chat_cache.config.data_check:
+                    is_healthy = cache_health_check(
+                        chat_cache.data_manager.v,
+                        {
+                            "embedding": cache_data.embedding_data,
+                            "search_result": search_data,
+                        },
+                    )
+                    if not is_healthy:
+                        continue
+
+                dot_product = np.dot(embedding_data, cache_data.embedding_data)
+                norm1 = np.linalg.norm(embedding_data)
+                norm2 = np.linalg.norm(cache_data.embedding_data)
+                cur_question_sim = dot_product / (norm1 * norm2)
+
+                if cur_question_sim > threshold:
+                    retrival_id_query[cache_data.cur_id] = True
+                    if method == "mean":
+                        cur_repr = np.mean(cur_context_data, axis=0)
+                        cache_repr = np.mean(cache_data.context_data, axis=0)
+                        context_dot = np.dot(cur_repr, cache_repr)
+                        context_norm = np.linalg.norm(cur_repr) * np.linalg.norm(cache_repr)
+                        context_rank = context_dot / context_norm
+                    elif method == "attention":
+                        context_rank = 0
+
+                    if context_rank > dialuoge_threshold:
+                        cache_answers.append(
+                            (float(context_rank), cache_data.answers[0].answer, search_data, cache_data)
+                        )
+                        retrival_id_context[cache_data.cur_id] = True
+                    else:
+                        retrival_id_context[cache_data.cur_id] = False
+                else:
+                    retrival_id_query[cache_data.cur_id] = False
+                chat_cache.data_manager.hit_cache_callback(search_data)
+
+          
+        if len(cache_answers) != 0:
+            cache_answers = sorted(cache_answers, key=lambda x: x[0], reverse=True)
+            answers_dict = dict((d[1], d) for d in cache_answers)
+            hit_callback = kwargs.pop("hit_callback", None)
+            if hit_callback and callable(hit_callback):
+                factor = 1
+                hit_callback([(d[3].question, d[0] / factor if factor else d[0]) for d in cache_answers])
+            def post_process():
+                if chat_cache.post_process_messages_func is temperature_softmax:
+                    return_message = chat_cache.post_process_messages_func(
+                        messages=[t[1] for t in cache_answers],
+                        scores=[t[0] for t in cache_answers],
+                        temperature=temperature,
+                    )
+                else:
+                    return_message = chat_cache.post_process_messages_func(
+                        [t[1] for t in cache_answers]
+                    )
+                return return_message
+            
+            return_message = time_cal(
+                post_process,
+                func_name="post_process",
+                report_func=chat_cache.report.post,
+            )()
+            
+            chat_cache.report.hint_cache()
+            cache_whole_data = answers_dict.get(str(return_message))
+            if session and cache_whole_data:
+                chat_cache.data_manager.add_session(
+                    cache_whole_data[2], session.name, pre_embedding_data
+                )
+            if cache_whole_data and not chat_cache.config.disable_report:
+                # user_question / cache_question / cache_question_id / cache_answer / similarity / consume time/ time
+                report_cache_data = cache_whole_data[3]
+                report_search_data = cache_whole_data[2]
+                chat_cache.data_manager.report_cache(
+                    pre_store_data if isinstance(pre_store_data, str) else "",
+                    report_cache_data.question
+                    if isinstance(report_cache_data.question, str)
+                    else "",
+                    report_search_data[1],
+                    report_cache_data.answers[0].answer
+                    if isinstance(report_cache_data.answers[0].answer, str)
+                    else "",
+                    cache_whole_data[0],
+                    round(time.time() - start_time, 6),
+                )
+            return cache_data_convert(return_message), True, retrival_id_query, retrival_id_context
+
+    next_cache = chat_cache.next_cache
+    if next_cache:
+        kwargs["cache_obj"] = next_cache
+        kwargs["cache_context"] = context
+        kwargs["cache_skip"] = cache_skip
+        kwargs["cache_factor"] = cache_factor
+        llm_data = adapt(
+            llm_handler, cache_data_convert, update_cache_callback, *args, **kwargs
+        )
+    else:
+        # llm_data = pre_store_data
+        if 'messages' in kwargs:
+            context_lines = []
+            current_question = kwargs['messages'][-1]["content"][-1]
+            if len(chat_cache.config.context_a) == 0:
+                kwargs['messages'][-1]["content"] = current_question
+            else:
+                for i in range(len(chat_cache.config.context_a)):
+                    user_q = chat_cache.config.context_q[i]
+                    model_a = chat_cache.config.context_a[i]
+                    context_lines.append(f"Previous user question: {user_q}")
+                    context_lines.append(f"Previous model response: {model_a}")
+                    context_lines.append("\n")
+
+                context_description = "Context\n\n" + "\n".join(context_lines) + "\n\n"
+                context_description += f"The above content is the previous contextual conversation record. Please answer the current question: {current_question}"
+                kwargs['messages'][-1]["content"] = context_description
+
+        llm_data = time_cal(
+            llm_handler, func_name="llm_request", report_func=chat_cache.report.llm
+        )(*args, **kwargs)
+        if llm_data is not None and isinstance(llm_data, dict) and "choices" in llm_data:
+            llm_data = llm_data["choices"][0]["message"]["content"]
+        # print(llm_data)
+
+    if cache_enable:
+        try:
+            def update_cache_func(handled_llm_data, question=None):
+                if question is None:
+                    question = pre_store_data
+                else:
+                    question.content = pre_store_data
+                time_cal(
+                    chat_cache.data_manager.save,
+                    func_name="save",
+                    report_func=chat_cache.report.save,
+                )(
+                    question,
+                    handled_llm_data,
+                    embedding_data,
+                    cur_context_data,
+                    cur_id,
+                    pre_id,
+                    extra_param=context.get("save_func", None),
+                    session=session,
+                )
+                if (
+                    chat_cache.report.op_save.count > 0
+                    and chat_cache.report.op_save.count % chat_cache.config.auto_flush
+                    == 0
+                ):
+                    chat_cache.flush()
+            llm_data = update_cache_callback(
+                llm_data, update_cache_func, *args, **kwargs
+            )
+        except Exception:  # pylint: disable=W0703
+            gptcache_log.error("failed to save the data to cache", exc_info=True)
+
+    chat_cache.config.cur_id = chat_cache.config.cur_id + 1
+    return llm_data, False, retrival_id_query, retrival_id_context
+
+
+async def aadapt(
+    llm_handler, cache_data_convert, update_cache_callback, *args, **kwargs
+):
+    """Simple copy of the 'adapt' method to different llm for 'async llm function'
+
+    :param llm_handler: Async LLM calling method, when the cache misses, this function will be called
     :param cache_data_convert: When the cache hits, convert the answer in the cache to the format of the result returned by llm
     :param update_cache_callback: If the cache misses, after getting the result returned by llm, save the result to the cache
     :param args: llm args

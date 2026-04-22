@@ -1,0 +1,123 @@
+ContextCache — Installation Instructions
+=========================================
+
+Tested on: macOS (Apple Silicon M1/M2), Python 3.11, conda 23+
+Also works on: Linux x86_64 with CUDA GPU (replace faiss-cpu with faiss-gpu if desired)
+
+
+1. Create and activate a conda environment
+------------------------------------------
+    conda create -n contextcache python=3.11 -y
+    conda activate contextcache
+
+
+2. Install FAISS (must use conda — pip build fails on Apple Silicon)
+--------------------------------------------------------------------
+    conda install -c conda-forge faiss-cpu -y
+
+
+3. Install the ContextCache gptcache package (editable)
+--------------------------------------------------------
+    cd /path/to/ContextCache
+    pip install -e .
+
+
+4. Install Python dependencies
+-------------------------------
+    # Sentence Transformers — pin to 2.7.0 to avoid huggingface-hub conflicts
+    pip install "sentence-transformers==2.7.0"
+
+    # PyTorch — for training and BatchOptimizedEncoder inference
+    #   macOS (MPS / CPU):
+    pip install torch
+
+    #   Linux with CUDA 12:
+    #   pip install torch --index-url https://download.pytorch.org/whl/cu121
+
+    # Other required packages
+    pip install numpy sqlalchemy onnxruntime transformers huggingface_hub
+
+
+5. Verify the installation
+---------------------------
+    python -c "
+    import faiss, torch, sentence_transformers
+    from gptcache import cache, Config
+    from gptcache.manager import get_data_manager, CacheBase, VectorBase
+    print('All imports OK')
+    print('FAISS version :', faiss.__version__)
+    print('PyTorch version:', torch.__version__)
+    print('MPS available  :', torch.backends.mps.is_available())
+    "
+
+
+6. Dataset files (not included in repo — too large)
+----------------------------------------------------
+Download from the GPTCache repository:
+    https://github.com/zilliztech/GPTCache
+
+Files needed:
+    similiar_qqp.json.gz       (~3 MB)  — for benchmark_contextcache.py and ablation_study.py
+    similiar_qqp_full.json.gz  (~8 MB)  — for train_context_model.py only
+
+Place them at:
+    ../GPTCache/examples/benchmark/similiar_qqp.json.gz
+    ../GPTCache/examples/benchmark/similiar_qqp_full.json.gz
+
+Or edit the QQP_PATH / QQP_FULL_PATH constants at the top of each script.
+
+
+7. (Optional) Train the BatchOptimizedEncoder
+----------------------------------------------
+Only needed if you want to retrain the context encoder from scratch.
+Pre-trained weights are NOT included in the repo (too large: ~90 MB).
+
+    python train_context_model.py \
+        --qqp_path ../GPTCache/examples/benchmark/similiar_qqp_full.json.gz \
+        --epochs 20 \
+        --batch_size 128
+
+First run (~10 min on MPS/CUDA):
+  - Embeds ~137k unique texts with all-MiniLM-L6-v2 → saves qqp_embeddings.npy (201 MB)
+  - Trains 20 epochs of triplet loss
+  - Saves best_model.pth to results/qqp_train/
+
+Subsequent runs reuse qqp_embeddings.npy:
+    python train_context_model.py --embed_cache qqp_embeddings.npy
+
+NOTE: qqp_embeddings.npy and *.pth files are gitignored due to size.
+      The model path in gptcache/similarity_evaluation/context_match.py is set to:
+          results/qqp_train/best_model.pth
+      relative to the ContextCache/ directory.
+
+
+8. Run the benchmark
+--------------------
+Single-turn QQP benchmark (300 inserted, 1000 tested):
+    python benchmark_contextcache.py --threshold 0.75 --reset
+
+Full ablation study (4 embeddings × 5 thresholds + ContextCache):
+    python ablation_study.py --reset --out results/ablation.csv
+
+Results CSV is already included at results/ablation.csv.
+
+
+Troubleshooting
+---------------
+- "faiss-cpu build fails" on Apple Silicon:
+    Use conda install, not pip install faiss-cpu.
+
+- "DryRunFileInfo ImportError" from sentence_transformers:
+    pip install "sentence-transformers==2.7.0"
+
+- "cannot reshape array of size 384 into shape (768)":
+    This was a bug in the original ContextCache — already fixed in this fork.
+    The fix is in gptcache/manager/scalar_data/sql_storage.py (dynamic embed_dim).
+
+- "SummarizationContextProcess segfault":
+    Fixed in gptcache/core.py — summarizer is now only loaded when input_summary_len
+    is set in Config (not by default).
+
+- Benchmark hangs on ContextCache-MiniLM:
+    Fixed — ContextMatchEvaluation (PyTorch model) is not loaded unless explicitly needed.
+    The ablation_study.py uses SearchDistanceEvaluation by default.
