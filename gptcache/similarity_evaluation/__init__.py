@@ -12,7 +12,8 @@ __all__ = [
     "CohereRerankEvaluation",
     "SequenceMatchEvaluation",
     "TimeEvaluation",
-    "SbertCrossencoderEvaluation"
+    "SbertCrossencoderEvaluation",
+    "LLMValidatorEvaluation",
 ]
 
 from gptcache.utils.lazy_import import LazyImport
@@ -77,3 +78,26 @@ def TimeEvaluation(evaluation: str, evaluation_config: Dict[str, Any], time_rang
 
 def SbertCrossencoderEvaluation(model: str = "cross-encoder/quora-distilroberta-base"):
     return sbert_crossencoder.SbertCrossencoderEvaluation(model)
+
+
+llm_validator = LazyImport(
+    "llm_validator", globals(), "gptcache.similarity_evaluation.llm_validator"
+)
+
+
+def LLMValidatorEvaluation(
+    openai_api_key: str,
+    openai_base_url: str = None,
+    llm_model: str = "gpt-4o",
+    max_answer_len: int = 600,
+    timeout: float = 8.0,
+    fallback_score: float = 0.5,
+):
+    return llm_validator.LLMValidatorEvaluation(
+        openai_api_key=openai_api_key,
+        openai_base_url=openai_base_url,
+        llm_model=llm_model,
+        max_answer_len=max_answer_len,
+        timeout=timeout,
+        fallback_score=fallback_score,
+    )

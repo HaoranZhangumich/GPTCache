@@ -1,119 +1,66 @@
-# GPTCache : A Library for Creating Semantic Cache for LLM Queries
-Slash Your LLM API Costs by 10x 💰, Boost Speed by 100x ⚡ 
+# CSE 584 — Semantic Caching Extensions for GPTCache
 
-[![Release](https://img.shields.io/pypi/v/gptcache?label=Release&color&logo=Python)](https://pypi.org/project/gptcache/)
-[![pip download](https://img.shields.io/pypi/dm/gptcache.svg?color=bright-green&logo=Pypi)](https://pypi.org/project/gptcache/)
-[![Codecov](https://img.shields.io/codecov/c/github/zilliztech/GPTCache/dev?label=Codecov&logo=codecov&token=E30WxqBeJJ)](https://codecov.io/gh/zilliztech/GPTCache)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/license/mit/)
-[![Twitter](https://img.shields.io/twitter/url/https/twitter.com/zilliz_universe.svg?style=social&label=Follow%20%40Zilliz)](https://twitter.com/zilliz_universe)
-[![Discord](https://img.shields.io/discord/1092648432495251507?label=Discord&logo=discord)](https://discord.gg/Q8C6WEjSWV)
+This repository extends [GPTCache](https://github.com/zilliztech/GPTCache) with two independent
+research contributions for the CSE 584 course project.
 
-🎉 GPTCache has been fully integrated with 🦜️🔗[LangChain](https://github.com/hwchase17/langchain) ! Here are detailed [usage instructions](https://python.langchain.com/docs/modules/model_io/models/llms/integrations/llm_caching#gptcache).
+| Contribution | Author | Module |
+|---|---|---|
+| **ContextCache** — context-aware two-stage retrieval | Haoran Zhang | `gptcache/similarity_evaluation/context_match.py` |
+| **LLM Intent Embedding + Validator** — LLM-based semantic embedding and hit validation | Hanfu Hou | `gptcache/embedding/llm_intent.py`, `gptcache/similarity_evaluation/llm_validator.py` |
 
-🐳 [The GPTCache server docker image](https://github.com/zilliztech/GPTCache/blob/main/docs/usage.md#Use-GPTCache-server) has been released, which means that **any language** will be able to use GPTCache!
-
-📔 This project is undergoing swift development, and as such, the API may be subject to change at any time. For the most up-to-date information, please refer to the latest [documentation]( https://gptcache.readthedocs.io/en/latest/) and [release note](https://github.com/zilliztech/GPTCache/blob/main/docs/release_note.md).
-
-**NOTE:** As the number of large models is growing explosively and their API shape is constantly evolving, we no longer add support for new API or models. We encourage the usage of using the get and set API in gptcache, here is the demo code: https://github.com/zilliztech/GPTCache/blob/main/examples/adapter/api.py
-
-## Quick Install
-
-`pip install gptcache`
-
-## 🚀 What is GPTCache?
-
-ChatGPT and various large language models (LLMs) boast incredible versatility, enabling the development of a wide range of applications. However, as your application grows in popularity and encounters higher traffic levels, the expenses related to LLM API calls can become substantial. Additionally, LLM services might exhibit slow response times, especially when dealing with a significant number of requests.
-
-To tackle this challenge, we have created GPTCache, a project dedicated to building a semantic cache for storing LLM responses. 
-
-## 😊 Quick Start
-
-**Note**:
-
-- You can quickly try GPTCache and put it into a production environment without heavy development. However, please note that the repository is still under heavy development.
-- By default, only a limited number of libraries are installed to support the basic cache functionalities. When you need to use additional features, the related libraries will be **automatically installed**.
-- Make sure that the Python version is **3.8.1 or higher**, check: `python --version`
-- If you encounter issues installing a library due to a low pip version, run: `python -m pip install --upgrade pip`.
-
-### dev install
-
-```bash
-# clone GPTCache repo
-git clone -b dev https://github.com/zilliztech/GPTCache.git
-cd GPTCache
-
-# install the repo
-pip install -r requirements.txt
-python setup.py install
-```
-
-### example usage
-
-These examples will help you understand how to use exact and similar matching with caching. You can also run the example on [Colab](https://colab.research.google.com/drive/1m1s-iTDfLDk-UwUAQ_L8j1C-gzkcr2Sk?usp=share_link). And more examples you can refer to the [Bootcamp](https://gptcache.readthedocs.io/en/latest/bootcamp/openai/chat.html)
-
-Before running the example, **make sure** the OPENAI_API_KEY environment variable is set by executing `echo $OPENAI_API_KEY`. 
-
-If it is not already set, it can be set by using `export OPENAI_API_KEY=YOUR_API_KEY` on Unix/Linux/MacOS systems or `set OPENAI_API_KEY=YOUR_API_KEY` on Windows systems. 
-
-> It is important to note that this method is only effective temporarily, so if you want a permanent effect, you'll need to modify the environment variable configuration file. For instance, on a Mac, you can modify the file located at `/etc/profile`.
-
-<details>
-
-<summary> Click to <strong>SHOW</strong> example code </summary>
-
-#### OpenAI API original usage
-
-```python
-import os
-import time
-
-import openai
-
-Demo: https://youtu.be/R3NByaQS7Ws
-
-## What is ContextCache?
-
-Large language models (LLMs) like ChatGPT enable powerful applications, but scaling them introduces
-significant costs and latency from repeated API calls. While solutions like GPTCache cache LLM
-responses through semantic matching, existing approaches focus on individual queries without
-considering conversational context.
-
-ContextCache addresses this with:
-- A **two-stage retrieval architecture** combining vector search with dialogue-aware matching
-- A **trained BatchOptimizedEncoder** (multi-layer cross-attention transformer) for context-aware similarity
-- **10× lower latency** than direct LLM calls
-- Improved precision and recall over GPTCache on multi-turn scenarios
+Demo video: https://youtu.be/R3NByaQS7Ws
 
 ---
 
 ## Repository Layout
 
 ```
-ContextCache/
-├── gptcache/                   # Modified gptcache package (ContextCache extensions)
-│   ├── adapter/adapter.py      # Two-stage retrieval logic
-│   ├── config.py               # similarity_threshold + dialuoge_threshold
-│   ├── core.py                 # Cache.init / import_data
+GPTCache/
+├── gptcache/
+│   ├── adapter/adapter.py              # ContextCache: two-stage retrieval adapter
+│   ├── config.py                       # ContextCache: similarity_threshold + dialuoge_threshold
+│   ├── core.py                         # ContextCache: import_data with context tracking
+│   ├── embedding/
+│   │   └── llm_intent.py               # LLM Intent: GPT-4o intent extraction + SBERT embed
+│   ├── manager/scalar_data/
+│   │   └── sql_storage.py              # ContextCache: dynamic embed_dim fix
 │   └── similarity_evaluation/
-│       └── context_match.py    # BatchOptimizedEncoder + ContextMatchEvaluation
-├── benchmark_contextcache.py   # Single-turn QQP benchmark (300 insert / 1000 test)
-├── ablation_study.py           # Embedding ablation across thresholds → CSV
-├── train_context_model.py      # Train BatchOptimizedEncoder on QQP pairs
-├── requirements.txt
-├── setup.py
-└── results/
-    └── ablation.csv            # Pre-computed ablation results
+│       ├── context_match.py            # ContextCache: BatchOptimizedEncoder evaluation
+│       └── llm_validator.py            # LLM Intent: LLM-based cache hit validator
+├── benchmark_contextcache.py           # ContextCache benchmark (QQP, 300/1000)
+├── ablation_study.py                   # Embedding ablation → results/ablation.csv
+├── train_context_model.py              # Train BatchOptimizedEncoder on QQP pairs
+├── examples/
+│   ├── benchmark/benchmark_llm_intent.py   # LLM Intent benchmark (QQP)
+│   └── cse584_llm_intent_demo.py           # LLM Intent interactive demo
+├── CSE584_LLM_Intent_Report.md             # LLM Intent detailed report
+├── results/
+│   └── ablation.csv                    # Pre-computed ablation results
+├── README.md                           # This file
+└── install.txt                         # Full installation instructions
 ```
 
 ---
 
-## Quick Start — Reproduce the ContextCache Benchmark
+## Contribution 1 — ContextCache (Haoran Zhang)
 
-### 1. Install dependencies
+### What it does
 
-See `install.txt` for the full step-by-step conda/pip instructions.
+Standard GPTCache treats each query independently. ContextCache adds a **two-stage retrieval
+architecture** that checks both the current query similarity *and* the conversational context
+before returning a cached answer. This prevents false hits when similar questions appear in
+different dialogue contexts.
 
-Short version (conda recommended):
+**Two-stage matching (inline in `adapter/adapter.py`):**
+1. **Stage 1** — cosine similarity between query embeddings > `similarity_threshold`
+2. **Stage 2** — mean cosine similarity between full context sequences > `dialuoge_threshold`
+
+**Trained `BatchOptimizedEncoder`** (multi-layer cross-attention transformer) learns richer
+context representations from labeled QQP pairs using triplet margin loss.
+
+### Quick Start
+
+**Install:**
 ```bash
 conda create -n contextcache python=3.11 -y
 conda activate contextcache
@@ -122,22 +69,17 @@ pip install -e .
 pip install "sentence-transformers==2.7.0" torch numpy
 ```
 
-### 2. Get the dataset
-
-The benchmark uses `similiar_qqp.json.gz` from the GPTCache repo:
-```bash
-# place it at:  ../GPTCache/examples/benchmark/similiar_qqp.json.gz
-# or edit QQP_PATH in benchmark_contextcache.py to point to your copy
+**Dataset** — place `similiar_qqp.json.gz` from the GPTCache repo at:
+```
+../GPTCache/examples/benchmark/similiar_qqp.json.gz
 ```
 
-### 3. Run the benchmark (single-turn QQP, threshold=0.75)
-
+**Run the benchmark** (300 inserted, 1000 tested = 300 pos + 700 neg):
 ```bash
-cd ContextCache
 python benchmark_contextcache.py --threshold 0.75 --reset
 ```
 
-Expected output (threshold=0.75):
+Expected output:
 ```
 =======================================================
 ContextCache Benchmark Results  (threshold=0.75)
@@ -155,42 +97,21 @@ F1 Score             : 0.7821
 Avg query latency    : ~16ms
 ```
 
-### 4. Run the full ablation study (all embeddings × all thresholds)
-
+**Run the full embedding ablation** (4 models × 5 thresholds + ContextCache):
 ```bash
 python ablation_study.py --reset --out results/ablation.csv
 ```
 
-This compares GPTCache-ONNX, GPTCache-MiniLM, GPTCache-BGE-Small, GPTCache-BGE-Base, and
-ContextCache-MiniLM across thresholds 0.70 / 0.75 / 0.80 / 0.85 / 0.90.
-Results are written to `results/ablation.csv` (pre-computed copy already included).
-
----
-
-## Train the Context Encoder (Optional)
-
-The `BatchOptimizedEncoder` is trained on labeled QQP pairs using triplet margin loss.
-You need `similiar_qqp_full.json.gz` (~80k pairs) from the GPTCache repo.
-
+**Train the context encoder** (optional — requires `similiar_qqp_full.json.gz`):
 ```bash
-# First run: embeds ~137k unique texts with MiniLM (saved to qqp_embeddings.npy)
 python train_context_model.py --epochs 20 --batch_size 128
-
-# Subsequent runs reuse the cached embeddings
-python train_context_model.py --embed_cache qqp_embeddings.npy --epochs 20
+# Checkpoint saved to results/qqp_train/best_model.pth
 ```
 
-Checkpoints are saved to `results/qqp_train/best_model.pth`.
-After training, `context_match.py` loads this path automatically.
-
-Training takes ~10 min on Apple Silicon (MPS) or CUDA GPU.
-
----
-
-## Ablation Results Summary
+### Ablation Results
 
 Pre-computed results from `results/ablation.csv`
-(dataset: similiar_qqp, 300 inserted, 1000 tested = 300 pos + 700 neg):
+(dataset: similiar_qqp, 300 inserted, 1000 tested):
 
 | System | Threshold | Precision | Recall | F1 | Avg Latency |
 |--------|-----------|-----------|--------|----|-------------|
@@ -204,12 +125,102 @@ Pre-computed results from `results/ablation.csv`
 | ContextCache-MiniLM | 0.75 | 0.7155 | 0.8622 | **0.7821** | 16ms |
 
 Key findings:
-- ONNX (paraphrase-albert) achieves the highest F1 (0.82) but is **10× slower** than SBERT models
-- MiniLM gives the best speed/accuracy trade-off at ~16ms latency
-- ContextCache's two-stage adapter matches MiniLM precision on single-turn queries and gains further advantage on multi-turn scenarios where conversational context disambiguates similar questions
+- ONNX achieves highest F1 (0.82) but is **10× slower** than SBERT models
+- MiniLM gives the best speed/accuracy trade-off at ~16ms
+- ContextCache's two-stage adapter gains further advantage on multi-turn scenarios
 
 ---
 
-## Citation / Course Project
+## Contribution 2 — LLM Intent Embedding + Validator (Hanfu Hou)
 
-This repository is part of CSE 584 course project exploring context-aware semantic caching.
+See [CSE584_LLM_Intent_Report.md](CSE584_LLM_Intent_Report.md) for the full write-up.
+
+### What it does
+
+Instead of embedding raw query text, **Step 1** calls GPT-4o to extract a structured
+"intent signature" (task type, domain, key entities, keywords), then **Step 2** embeds
+that signature with a local SBERT model. Two paraphrases of the same question produce
+nearly identical vectors regardless of surface wording.
+
+The **LLM Validator** sits after vector search and re-scores each cache hit candidate
+by asking the LLM: *"Is this cached answer actually appropriate for the new question?"*
+This catches false positives that embedding similarity alone misses (e.g. Python vs Java
+sorting questions).
+
+**Pipeline:**
+```
+Raw query
+   ↓ GPT-4o (Vocareum API) — intent extraction
+{ task_type, domain, required_facts, constraints, intent_keywords }
+   ↓ SBERT local model — embed intent text
+384-dim vector → FAISS search → [optional] LLM Validator re-score → cache answer
+```
+
+### Quick Start
+
+**Requires a Vocareum API key** (Canvas → CSE 584 → Vocareum LTI → AI sticky note icon).
+
+**Run the benchmark:**
+```bash
+cd examples/benchmark
+
+# Quick test (20 queries)
+python benchmark_llm_intent.py \
+    --api-key YOUR_VOC_KEY \
+    --base-url https://genai.vocareum.com/v1 \
+    --limit 20
+
+# Full test (999 queries, matches teammate's benchmark format)
+python benchmark_llm_intent.py \
+    --api-key YOUR_VOC_KEY \
+    --base-url https://genai.vocareum.com/v1 \
+    --limit 999
+
+# Threshold sweep
+python benchmark_llm_intent.py \
+    --api-key YOUR_VOC_KEY \
+    --base-url https://genai.vocareum.com/v1 \
+    --limit 100 --sweep
+```
+
+**Use in code:**
+```python
+from gptcache.embedding.llm_intent import LLMIntentEmbedding
+from gptcache.similarity_evaluation.llm_validator import LLMValidatorEvaluation
+
+# Step 1: LLM intent embedding
+embed = LLMIntentEmbedding(
+    openai_api_key="voc-...",
+    openai_base_url="https://genai.vocareum.com/v1",
+    llm_model="@azure-1/gpt-4o",
+)
+
+# Step 2: LLM validator (optional, replaces SearchDistanceEvaluation)
+validator = LLMValidatorEvaluation(
+    openai_api_key="voc-...",
+    openai_base_url="https://genai.vocareum.com/v1",
+)
+
+cache.init(
+    embedding_func=embed.to_embeddings,
+    similarity_evaluation=validator,
+    ...
+)
+```
+
+---
+
+## Installation
+
+See [install.txt](install.txt) for the full step-by-step guide covering both contributions,
+including all known issues and fixes.
+
+---
+
+## Bug Fixes in This Fork
+
+| File | Fix |
+|------|-----|
+| `gptcache/core.py` | `SummarizationContextProcess` is now lazy-loaded (only when `input_summary_len` is set) — prevents segfault on import |
+| `gptcache/adapter/adapter.py` | `llm_data["choices"]` access is now guarded against `None` return from cache-miss handler |
+| `gptcache/manager/scalar_data/sql_storage.py` | Context data reshape uses dynamic `embed_dim` instead of hardcoded 768 — fixes 384-dim embedding support |

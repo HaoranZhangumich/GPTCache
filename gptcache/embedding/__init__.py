@@ -12,6 +12,7 @@ __all__ = [
     "Rwkv",
     "PaddleNLP",
     "UForm",
+    "LLMIntentEmbedding",
 ]
 
 
@@ -82,3 +83,24 @@ def PaddleNLP(model="ernie-3.0-medium-zh"):
 
 def UForm(model="unum-cloud/uform-vl-multilingual", embedding_type="text"):
     return uform.UForm(model, embedding_type)
+
+
+llm_intent = LazyImport("llm_intent", globals(), "gptcache.embedding.llm_intent")
+
+
+def LLMIntentEmbedding(
+    openai_api_key: str,
+    openai_base_url: str = None,
+    llm_model: str = "gpt-4o",
+    embedding_model: str = "text-embedding-ada-002",
+    dimension: int = 1536,
+    timeout: float = 10.0,
+):
+    return llm_intent.LLMIntentEmbedding(
+        openai_api_key=openai_api_key,
+        openai_base_url=openai_base_url,
+        llm_model=llm_model,
+        embedding_model=embedding_model,
+        dimension=dimension,
+        timeout=timeout,
+    )

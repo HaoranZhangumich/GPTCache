@@ -1,5 +1,5 @@
-ContextCache — Installation Instructions
-=========================================
+ContextCache + LLM Intent — Installation Instructions
+======================================================
 
 Tested on: macOS (Apple Silicon M1/M2), Python 3.11, conda 23+
 Also works on: Linux x86_64 with CUDA GPU (replace faiss-cpu with faiss-gpu if desired)
@@ -37,6 +37,9 @@ Also works on: Linux x86_64 with CUDA GPU (replace faiss-cpu with faiss-gpu if d
     # Other required packages
     pip install numpy sqlalchemy onnxruntime transformers huggingface_hub
 
+    # OpenAI client — required for LLM Intent Embedding and LLM Validator
+    pip install "openai>=1.0.0"
+
 
 5. Verify the installation
 ---------------------------
@@ -48,6 +51,13 @@ Also works on: Linux x86_64 with CUDA GPU (replace faiss-cpu with faiss-gpu if d
     print('FAISS version :', faiss.__version__)
     print('PyTorch version:', torch.__version__)
     print('MPS available  :', torch.backends.mps.is_available())
+    "
+
+    # Verify LLM Intent and Validator modules
+    python -c "
+    from gptcache.embedding.llm_intent import LLMIntentEmbedding
+    from gptcache.similarity_evaluation.llm_validator import LLMValidatorEvaluation
+    print('LLM modules OK')
     "
 
 
@@ -67,7 +77,20 @@ Place them at:
 Or edit the QQP_PATH / QQP_FULL_PATH constants at the top of each script.
 
 
-7. (Optional) Train the BatchOptimizedEncoder
+7. Vocareum API key (required for LLM Intent and LLM Validator)
+----------------------------------------------------------------
+The LLM Intent Embedding and LLM Validator both call GPT-4o via the Vocareum API.
+
+To obtain your key:
+    Canvas → CSE 584 → Vocareum LTI → AI sticky note icon
+
+Set it as an environment variable before running LLM benchmarks:
+    export VOCAREUM_API_KEY="voc-..."
+
+Or pass it directly with --api-key on the command line (see step 10).
+
+
+8. (Optional) Train the BatchOptimizedEncoder
 ----------------------------------------------
 Only needed if you want to retrain the context encoder from scratch.
 Pre-trained weights are NOT included in the repo (too large: ~90 MB).
@@ -91,8 +114,8 @@ NOTE: qqp_embeddings.npy and *.pth files are gitignored due to size.
       relative to the ContextCache/ directory.
 
 
-8. Run the benchmark
---------------------
+9. Run the ContextCache benchmark
+----------------------------------
 Single-turn QQP benchmark (300 inserted, 1000 tested):
     python benchmark_contextcache.py --threshold 0.75 --reset
 
@@ -100,6 +123,35 @@ Full ablation study (4 embeddings × 5 thresholds + ContextCache):
     python ablation_study.py --reset --out results/ablation.csv
 
 Results CSV is already included at results/ablation.csv.
+
+
+10. Run the LLM Intent benchmark
+----------------------------------
+    cd examples/benchmark
+
+    # Quick test (20 queries)
+    python benchmark_llm_intent.py \
+        --api-key YOUR_VOC_KEY \
+        --base-url https://genai.vocareum.com/v1 \
+        --limit 20
+
+    # Full test (999 queries)
+    python benchmark_llm_intent.py \
+        --api-key YOUR_VOC_KEY \
+        --base-url https://genai.vocareum.com/v1 \
+        --limit 999
+
+    # Threshold sweep
+    python benchmark_llm_intent.py \
+        --api-key YOUR_VOC_KEY \
+        --base-url https://genai.vocareum.com/v1 \
+        --limit 100 --sweep
+
+    # Interactive demo
+    cd examples
+    python cse584_llm_intent_demo.py \
+        --api-key YOUR_VOC_KEY \
+        --base-url https://genai.vocareum.com/v1
 
 
 Troubleshooting
@@ -121,3 +173,11 @@ Troubleshooting
 - Benchmark hangs on ContextCache-MiniLM:
     Fixed — ContextMatchEvaluation (PyTorch model) is not loaded unless explicitly needed.
     The ablation_study.py uses SearchDistanceEvaluation by default.
+
+- "openai.AuthenticationError" or "Invalid API key":
+    Make sure you are using a Vocareum API key (voc-...), not an OpenAI key.
+    Pass --base-url https://genai.vocareum.com/v1 to point at the Vocareum endpoint.
+
+- LLM Intent benchmark is slow:
+    Each query makes two LLM API calls (intent extraction + optional validation).
+    Use --limit 20 for a quick smoke test before running the full 999-query benchmark.
